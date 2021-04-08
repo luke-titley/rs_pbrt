@@ -433,7 +433,7 @@ impl Film {
         splat_xyz[2] += xyz[2];
     }
     #[cfg(not(feature = "openexr"))]
-    pub fn write_image(&self, splat_scale: Float) {
+    pub fn write_buffer(&self, splat_scale: Float) -> (Vec<u8>, u32, u32) {
         let mut rgb: Vec<Float> =
             vec![0.0 as Float; (3 * self.cropped_pixel_bounds.area()) as usize];
         let mut offset;
@@ -514,6 +514,14 @@ impl Film {
                 ) as u8;
             }
         }
+        
+        (buffer, width, height)
+    }
+
+    #[cfg(not(feature = "openexr"))]
+    pub fn write_image(&self, splat_scale: Float) {
+        let (buffer, width, height) = self.write_buffer(splat_scale);
+
         // write "pbrt.png" to disk
         image::save_buffer(
             &Path::new("pbrt.png"),
@@ -521,9 +529,9 @@ impl Film {
             width,
             height,
             image::ColorType::Rgb8,
-        )
-        .unwrap();
+        ).unwrap();
     }
+
     #[cfg(feature = "openexr")]
     pub fn write_image(&self, splat_scale: Float) {
         let mut rgb: Vec<Float> =
