@@ -64,10 +64,18 @@ impl SamplerIntegrator {
             SamplerIntegrator::Whitted(integrator) => integrator.preprocess(scene),
         }
     }
+    pub fn render(&mut self, scene: &Scene, num_threads: u8) {
+        self.progressive_render(scene, num_threads, None)
+    }
+
     /// All [SamplerIntegrators](enum.SamplerIntegrator.html) use the
     /// same render loop, but call an individual
     /// [li()](enum.SamplerIntegrator.html#method.li) method.
-    pub fn render(&mut self, scene: &Scene, num_threads: u8) {
+    pub fn progressive_render<F>(&mut self, scene: &Scene, num_threads: u8,
+                                 mut f: Option<F>)
+    where
+        F: FnMut(&super::film::Film) -> bool
+    {
         let film = self.get_camera().get_film();
         let sample_bounds: Bounds2i = film.get_sample_bounds();
         self.preprocess(scene);
@@ -210,12 +218,20 @@ impl SamplerIntegrator {
                         let film_tile = pixel_rx.recv().unwrap();
                         // merge image tile into _Film_
                         film.merge_film_tile(&film_tile);
+
+                        // If a progressive function has been given, then run
+                        // it.
+                        if let Some(f) = f {
+                            if !f(film) {
+                                break;
+                            }
+                        }
                     }
                 });
             })
             .unwrap();
         }
-        film.write_image(1.0 as Float);
+        //film.write_image(1.0 as Float);
     }
     pub fn li(&self, ray: &mut Ray, scene: &Scene, sampler: &mut Sampler, depth: i32) -> Spectrum {
         match self {
