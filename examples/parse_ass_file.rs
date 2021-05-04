@@ -243,7 +243,10 @@ fn make_scene(primitives: &Vec<Arc<Primitive>>, lights: Vec<Arc<Light>>) -> Scen
 fn main() -> std::io::Result<()> {
     let num_cores = num_cpus::get();
     let git_describe = option_env!("GIT_DESCRIBE").unwrap_or("unknown");
-    println!("parse_ass_file version {} ({}) [Detected {} cores]", VERSION, git_describe, num_cores);
+    println!(
+        "parse_ass_file version {} ({}) [Detected {} cores]",
+        VERSION, git_describe, num_cores
+    );
     // handle command line options
     let args = Cli::from_args();
     let samples_per_pixel: u16 = args.samples;
@@ -964,10 +967,8 @@ fn main() -> std::io::Result<()> {
                                         None,
                                     ));
                                     for id in 0..mesh.n_triangles {
-                                        let triangle = Arc::new(Shape::Trngl(Triangle::new(
-                                            mesh.clone(),
-                                            id,
-                                        )));
+                                        let triangle =
+                                            Arc::new(Shape::Trngl(Triangle::new(mesh.clone(), id)));
                                         shapes.push(triangle.clone());
                                     }
                                     let mi: MediumInterface = MediumInterface::default();

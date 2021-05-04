@@ -65,17 +65,21 @@ impl SamplerIntegrator {
         }
     }
     pub fn render(&mut self, scene: &Scene, num_threads: u8) {
-        self.progressive_render(scene, num_threads, None)
+        self.progressive_render(scene, num_threads, |_|{}, || {true})
     }
 
     /// All [SamplerIntegrators](enum.SamplerIntegrator.html) use the
     /// same render loop, but call an individual
     /// [li()](enum.SamplerIntegrator.html#method.li) method.
-    pub fn progressive_render<F>(&mut self, scene: &Scene, num_threads: u8,
-                                 mut f: Option<F>)
+    pub fn progressive_render<F, C>(&mut self, scene: &Scene, num_threads: u8,
+                                 mut f: F,
+                                 c: C)
     where
-        F: FnMut(&super::film::Film) -> bool
+        F: FnMut(&super::film::Film) + Send + Sync,
+        C: Fn() -> bool + Send + Sync,
     {
+        let carry_on = std::sync::Arc::new(c);
+
         let film = self.get_camera().get_film();
         let sample_bounds: Bounds2i = film.get_sample_bounds();
         self.preprocess(scene);
@@ -90,7 +94,7 @@ impl SamplerIntegrator {
         } else {
             num_threads as usize
         };
-        println!("Rendering with {:?} thread(s) ...", num_cores);
+
         {
             let block_queue = BlockQueue::new(
                 (
@@ -100,6 +104,7 @@ impl SamplerIntegrator {
                 (tile_size as u32, tile_size as u32),
                 (0, 0),
             );
+
             let integrator = &self;
             let bq = &block_queue;
             let sampler = &self.get_sampler();
@@ -110,10 +115,17 @@ impl SamplerIntegrator {
                 let (pixel_tx, pixel_rx) = crossbeam_channel::bounded(num_cores);
                 // spawn worker threads
                 for _ in 0..num_cores {
+
+                    let continue_render = carry_on.clone();
                     let pixel_tx = pixel_tx.clone();
                     let mut tile_sampler: Box<Sampler> = sampler.clone_with_seed(0_u64);
                     scope.spawn(move |_| {
                         while let Some((x, y)) = bq.next() {
+                            // Break loop if we shouldn't continue
+                            if !continue_render() {
+                                break;
+                            }
+
                             let tile: Point2i = Point2i {
                                 x: x as i32,
                                 y: y as i32,
@@ -172,7 +184,7 @@ impl SamplerIntegrator {
                                     if l.has_nans() {
                                         println!(
                                             "Not-a-number radiance value returned for pixel \
-                                                     ({:?}, {:?}), sample {:?}. Setting to black.",
+                                                    ({:?}, {:?}), sample {:?}. Setting to black.",
                                             pixel.x,
                                             pixel.y,
                                             tile_sampler.get_current_sample_number()
@@ -181,7 +193,7 @@ impl SamplerIntegrator {
                                     } else if y < -10.0e-5 as Float {
                                         println!(
                                             "Negative luminance value, {:?}, returned for pixel \
-                                                 ({:?}, {:?}), sample {:?}. Setting to black.",
+                                                ({:?}, {:?}), sample {:?}. Setting to black.",
                                             y,
                                             pixel.x,
                                             pixel.y,
@@ -191,15 +203,15 @@ impl SamplerIntegrator {
                                     } else if y.is_infinite() {
                                         println!(
                                             "Infinite luminance value returned for pixel ({:?}, \
-                                                 {:?}), sample {:?}. Setting to black.",
+                                                {:?}), sample {:?}. Setting to black.",
                                             pixel.x,
                                             pixel.y,
                                             tile_sampler.get_current_sample_number()
                                         );
                                         l = Spectrum::new(0.0);
                                     }
-                                    // println!("Camera sample: {:?} -> ray: {:?} -> L = {:?}",
-                                    //          camera_sample, ray, l);
+                                    //println!("Camera sample: {:?} -> L = {:?}",
+                                    //         camera_sample, l);
                                     // add camera ray's contribution to image
                                     film_tile.add_sample(camera_sample.p_film, &mut l, ray_weight);
                                     done = !tile_sampler.start_next_sample();
@@ -215,21 +227,21 @@ impl SamplerIntegrator {
                 // spawn thread to collect pixels and render image to file
                 scope.spawn(move |_| {
                     for _ in pbr::PbIter::new(0..bq.len()) {
-                        let film_tile = pixel_rx.recv().unwrap();
-                        // merge image tile into _Film_
-                        film.merge_film_tile(&film_tile);
-
-                        // If a progressive function has been given, then run
-                        // it.
-                        if let Some(f) = f {
-                            if !f(film) {
-                                break;
-                            }
+                        if !carry_on() {
+                            break;
                         }
+                        if let Ok(film_tile) = pixel_rx.recv() {
+                            // merge image tile into _Film_
+                            film.merge_film_tile(&film_tile);
+
+                            // Run progressive render callback
+                            f(film);
+                        }
+                        
                     }
                 });
-            })
-            .unwrap();
+            });
+            //.unwrap();
         }
         //film.write_image(1.0 as Float);
     }

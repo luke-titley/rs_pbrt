@@ -1045,10 +1045,7 @@ impl RenderOptions {
             // create individual triangles
             let mut triangles: Vec<Arc<Shape>> = Vec::new();
             for id in 0..mesh.n_triangles {
-                let triangle = Arc::new(Shape::Trngl(Triangle::new(
-                    mesh.clone(),
-                    id,
-                )));
+                let triangle = Arc::new(Shape::Trngl(Triangle::new(mesh.clone(), id)));
                 triangles.push(triangle.clone());
                 shapes.push(triangle.clone());
             }

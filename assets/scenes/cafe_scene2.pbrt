@@ -8,7 +8,7 @@ Camera "perspective"
 Film "image"
   "integer xresolution" [ 500 ]
   "integer yresolution" [ 500 ]
-Sampler "lowdiscrepancy" "integer pixelsamples" [32]
+Sampler "lowdiscrepancy" "integer pixelsamples" [8]
 PixelFilter "gaussian" "float xwidth" [2.000000 ] "float ywidth" [2.000000 ]
 Integrator "bdpt" "integer maxdepth" [3]
 WorldBegin

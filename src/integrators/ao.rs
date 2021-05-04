@@ -90,8 +90,12 @@ impl AOIntegrator {
                         z: s.z * wi.x + t.z * wi.y + n.z * wi.z,
                     };
                     if pdf != 0.0 as Float && !scene.intersect_p(&mut isect.spawn_ray(&wi)) {
+                        //println!("Intersection!");
+                        /*
                         l +=
                             Spectrum::new(vec3_dot_nrmf(&wi, &n) / (pdf * self.n_samples as Float));
+                        */
+                        l += Spectrum::new(1_f32);
                     }
                 }
             }

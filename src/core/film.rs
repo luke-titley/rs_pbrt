@@ -476,12 +476,6 @@ impl Film {
             rgb[start + 1] *= self.scale;
             rgb[start + 2] *= self.scale;
         }
-        let filename = "pbrt.png";
-        println!(
-            "Writing image {:?} with bounds {:?}",
-            filename, // TODO: self.filename,
-            self.cropped_pixel_bounds
-        );
         // TODO: pbrt::WriteImage(filename, &rgb[0], croppedPixelBounds, fullResolution);
         let mut buffer: Vec<u8> = vec![0.0 as u8; (3 * self.cropped_pixel_bounds.area()) as usize];
         // 8-bit format; apply gamma (see WriteImage(...) in imageio.cpp)
@@ -514,7 +508,7 @@ impl Film {
                 ) as u8;
             }
         }
-        
+
         (buffer, width, height)
     }
 
@@ -529,7 +523,8 @@ impl Film {
             width,
             height,
             image::ColorType::Rgb8,
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     #[cfg(feature = "openexr")]
